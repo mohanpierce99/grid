@@ -23,9 +23,6 @@ app.get("/order", (req, res) => {
     let lng = req.query.lng[1];
     controller.brain(lat,lng)
     res.send("Thanks");
-});
+}); //
 
 
-app.post("/getBranch",(req,res)=>{
-
-});

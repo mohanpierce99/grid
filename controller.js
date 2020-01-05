@@ -125,6 +125,7 @@ function L2calc(L1filteredBranches,lat,lng) { // 2nd Layer decision Tree To judg
         .sortBy(branch => branch["ETA"])
         .filter(x => x["ETA"] <= (t - 300))
         .value()
+        var payload=L2filteredBranches;
 
     if (L2filteredBranches.length >= 2) {
         L2filteredBranches.forEach((l) => {
@@ -136,22 +137,20 @@ function L2calc(L1filteredBranches,lat,lng) { // 2nd Layer decision Tree To judg
             console.log("lol")
             console.log(finalFiltered[0].load,"====?",finalFiltered[0].load["05/01/2020"]+1);
             incLoad(finalFiltered[0].name,finalFiltered[0].load["05/01/2020"]+1);
-            decDelB(finalFiltered[0].name, finalFiltered[0].lat, finalFiltered[1].lng,lat,lng);
+            decDelB(finalFiltered[0].name, finalFiltered[0].lat, finalFiltered[0].lng,lat,lng,payload);
             return finalFiltered[0]
         } else {
             let needed = finalFiltered[0].magic
             finalFiltered = finalFiltered.filter(x => x.magic == needed)
             console.log(dataDict);
             let assignedBatch = _.chain(finalFiltered).sortBy(x => x.limit).value().reverse()[0];
-            console.log(assignedBatch.load["05/01/2020"]+1+"fucker1");
             incLoad(assignedBatch.name,assignedBatch.load["05/01/2020"]+1);
-            decDelB(assignedBatch.name, assignedBatch.lat, assignedBatch.lng,lat,lng);
+            decDelB(assignedBatch.name, assignedBatch.lat, assignedBatch.lng,lat,lng,payload);
             return assignedBatch;
         }
     } else {
-        console.log(L2filteredBranches[0].load["05/01/2020"]+1+"two")
         incLoad(L2filteredBranches[0].name,L2filteredBranches[0].load["05/01/2020"]+1);
-        decDelB(L2filteredBranches[0].name, L2filteredBranches[0].lat, L2filteredBranches[0].lng,lat,lng);
+        decDelB(L2filteredBranches[0].name, L2filteredBranches[0].lat, L2filteredBranches[0].lng,lat,lng,payload);
         return L2filteredBranches[0]
     }
 }
@@ -163,14 +162,15 @@ function incLoad(branch,nos) { //util function that increases the load
 }
 
 
-function decDelB(branch,rlat,rlng,lat, lng) {
+function decDelB(branch,rlat,rlng,lat, lng,payload) {
     updelB("McDonalds", [
         [branch]
     ]);
     db.collection("live").doc(lat + "_" + lng).update({
         serve: true,
         rlat,
-        rlng
+        rlng,
+        payload
     });
 }
 
