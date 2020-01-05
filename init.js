@@ -10,8 +10,9 @@ var firebaseConfig = {
     appId: "1:400973548030:web:cf1301d7e7ab4b011b58af"
   };
   // Initialize Firebase
-  firebase.initializeApp(firebaseConfig);
-console.log("hai")
+
+firebase.initializeApp(firebaseConfig);
+
 var db=firebase.firestore()
 
-module.exports=db;
+module.exports={db,firebase};
