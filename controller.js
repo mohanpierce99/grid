@@ -53,11 +53,17 @@ async function brain(lat, lng) {
     });
 
 
-    let L1filteredBranches = L1calc(mainArr,lat,lng)
+    let L1filteredBranches = L1calc(mainArr,lat,lng);
+    var payload1=JSON.parse(JSON.stringify(L1filteredBranches));
+    console.log("===============Level 1 ===========Layer")
+    console.log("\n");
+    console.log(payload1)
+    console.log("=========================")
 
     let cacheFlag;
 
     if ((cacheFlag = check(lat, lng))) {
+        console.log("cache hit !!!! Evading API call");
 
         //Cache HIT
 
@@ -70,8 +76,11 @@ async function brain(lat, lng) {
                 }
             })
         });
-        L2calc(cacheFlag.data, lat, lng);
+
+        L2calc(cacheFlag.data, lat, lng,payload1);
     } else { // Cache MISS
+
+        console.log("Cache MISSSS");
 
         await ETAcalc(L1filteredBranches, [{
             lat,
@@ -84,7 +93,7 @@ async function brain(lat, lng) {
             lng
         })
         //update cache        
-        return L2calc(L1filteredBranches, lat, lng)
+        return L2calc(L1filteredBranches, lat, lng,payload1)
     }
 
 }
@@ -111,46 +120,62 @@ function check(lt, ln) { // Function which checks if result exists in cache
 function L1calc(mainArr,lat,lng) { // 1st layer filtering algorithm ( Pure function -- Functional programming)
 
     let L1filteredBranches = _.chain(mainArr)
-        .filter(x => x.limit != x.load["05/01/2020"] && x.delB != 0)
+        .filter(x => x.limit != x.load["05/01/2020"] && x.delB > 0)
         .map((branch) => (branch.distance = convertToM(lat, lng, branch.lat, branch.lng), branch)) //Distance calc
         .sortBy(branch => branch.distance)
         .filter((x, i, a) => i <= Math.ceil(a.length * 0.5) - 1)
         .value();
 
+
     return L1filteredBranches;
 }
 
-function L2calc(L1filteredBranches,lat,lng) { // 2nd Layer decision Tree To judge,assert and allocate
-    let L2filteredBranches = _.chain(L1filteredBranches)
+function L2calc(L1filteredBranches,lat,lng,payload1) { // 2nd Layer decision Tree To judge,assert and allocate
+    console.log("After ETA Calculation - Layer 2");
+    console.log("=====================")
+    console.log(L1filteredBranches);
+    console.log("============================");
+    var L2filteredBranches = _.chain(L1filteredBranches)
         .sortBy(branch => branch["ETA"])
         .filter(x => x["ETA"] <= (t - 300))
-        .value()
-        var payload=L2filteredBranches;
+        .value();
+         
+        var finalFiltered;
+
+        var payload=JSON.parse(JSON.stringify(L2filteredBranches));
+        console.log("Sorting ETA with demand-delivery")
+        console.log("===============Level 3 ===========Layer");
+        console.log(payload);
+        console.log("=======================================")
 
     if (L2filteredBranches.length >= 2) {
         L2filteredBranches.forEach((l) => {
             l.magic = l.limit - l.load["05/01/2020"]
         });
-
-        let finalFiltered = _.chain(L2filteredBranches).sortBy(branch => branch.magic).value().reverse();
+        
+          console.log("Final layer=========================")
+        finalFiltered = _.chain(L2filteredBranches).sortBy(branch => branch.magic).value().reverse();
+        console.log(finalFiltered);
+        console.log("=================================")
         if (finalFiltered[0].magic > finalFiltered[1].magic) {
-            console.log("lol")
             console.log(finalFiltered[0].load,"====?",finalFiltered[0].load["05/01/2020"]+1);
             incLoad(finalFiltered[0].name,finalFiltered[0].load["05/01/2020"]+1);
-            decDelB(finalFiltered[0].name, finalFiltered[0].lat, finalFiltered[0].lng,lat,lng,payload);
+            decDelB(finalFiltered[0].name, finalFiltered[0].lat, finalFiltered[0].lng,lat,lng,payload,payload1,finalFiltered);
             return finalFiltered[0]
         } else {
             let needed = finalFiltered[0].magic
             finalFiltered = finalFiltered.filter(x => x.magic == needed)
-            console.log(dataDict);
             let assignedBatch = _.chain(finalFiltered).sortBy(x => x.limit).value().reverse()[0];
             incLoad(assignedBatch.name,assignedBatch.load["05/01/2020"]+1);
-            decDelB(assignedBatch.name, assignedBatch.lat, assignedBatch.lng,lat,lng,payload);
+            decDelB(assignedBatch.name, assignedBatch.lat, assignedBatch.lng,lat,lng,payload,payload1,finalFiltered);
             return assignedBatch;
         }
     } else {
+        console.log("Final layer=========================")
+       console.log(L2filteredBranches[0]);
+       console.log("======================================");
         incLoad(L2filteredBranches[0].name,L2filteredBranches[0].load["05/01/2020"]+1);
-        decDelB(L2filteredBranches[0].name, L2filteredBranches[0].lat, L2filteredBranches[0].lng,lat,lng,payload);
+        decDelB(L2filteredBranches[0].name, L2filteredBranches[0].lat, L2filteredBranches[0].lng,lat,lng,payload,payload1,L2filteredBranches[0]);
         return L2filteredBranches[0]
     }
 }
@@ -158,20 +183,39 @@ function L2calc(L1filteredBranches,lat,lng) { // 2nd Layer decision Tree To judg
 function incLoad(branch,nos) { //util function that increases the load
     upLoads("McDonalds", [
         [branch,nos]
-    ])
+    ]);
+    dataDict.forEach((x)=>{
+        x['data'].forEach((l)=>{
+            if(l.name==branch){
+                l.load=nos
+            }
+        })
+    })
 }
 
 
-function decDelB(branch,rlat,rlng,lat, lng,payload) {
+function decDelB(branch,rlat,rlng,lat, lng,payload,payload1,finalFiltered) {
     updelB("McDonalds", [
         [branch]
     ]);
+
+    dataDict.forEach((x)=>{
+        x['data'].forEach((l)=>{
+            if(l.name==branch){
+                l.delB=l.delB-1
+            }
+        })
+    })
+
     db.collection("live").doc(lat + "_" + lng).update({
         serve: true,
         rlat,
         rlng,
-        payload
+        payload,
+        payload1,
+        finalFiltered
     });
+
 }
 
 
@@ -256,7 +300,6 @@ async function upLoads(store, obj, i,nos) { //Change Load api
 
 
 function updelB(store, obj, i) { // Change delivery boy count
-    console.log("hit", store, obj[0]);
     obj.forEach((x) => {
         if (x[1] == undefined) {
             if (i != undefined) {
